@@ -1,0 +1,224 @@
+app-node.js
+var http_port = 8126;
+
+var http = require('http');
+var htutil = require('./htutil');
+
+var server = http.createServer(function(req, res){
+    console.log("in server");
+    htutil.loadParams(req, res, undefined);
+    if (req.requrl.pathname === '/'){
+        require('./home-node').get(req, res);
+    }else if (req.requrl.pathname === '/square'){
+        require('./square-node').get(req, res);
+    }else if (req.requrl.pathname === '/factorial'){
+        require('./factorial-node').get(req, res);
+    }else if (req.requrl.pathname === '/fibonacci'){
+        require('./fibo-node').get(req, res);
+    }else if (req.requrl.pathname === '/mult'){
+        require('./mult-node').get(req, res);
+    }else{
+        res.writeHead(404, {'Content-Type': 'text/plain'});
+        res.end("bad url" + req.url);
+    }
+});
+server.listen(http_port);
+console.log('listening to http://localhost:8126');
+
+factorial-node.js
+var htutil = require('./htutil');
+var math = require('./math');
+var char = "utf-8"
+exports.get = function(req, res){
+    res.writeHead(200, {'Content-Type': 'text/html'});
+    res.end(
+        htutil.page("Factorial", htutil.navbar(), [
+            (!isNaN(req.a) ?
+                ("<p class='result'><meta charset=\"UTF-8\">{a}！= {fact}</p>"
+                    .replace("{a}", req.a)
+                    .replace("{fact}", math.factorial(Math.floor(req.a))))
+                : ""),
+            "<p>Enter numbers to see its factorial</p>",
+            "<form name='factorial' action='/factorial' method='get'>",
+            "A: <input type='text' name='a' /><br/>",
+            "<input type='submit' value='Submit' />",
+            "</form>"
+        ].join('\n'))
+    );
+}
+
+fibo2-node.js
+var htutil = require('./htutil');
+var math = require('./math');
+function sendResult(req, res, a, fiboval){
+    res.writeHead(200, {'Content-Type': 'text/html'});
+    res.end(
+        htutil.page("Fibonacci", htutil.navbar(), [
+            (!isNaN(fiboval) ?
+                ("<p class='result'>{a} fibonacci = {fibo}</p>"
+                    .replace("{a}", a)
+                    .replace("{fibo}", fiboval))
+                : ""),
+            "<p>Enter numbers to see its fibonacci</p>",
+            "<form name='fibonacci' action='/fibonacci' method='get'>",
+            "A: <input type='text' name='a' /><br/>",
+            "<input type='submit' value='Submit' />",
+            "</form>"
+        ].join('\n'))
+    );
+}
+exports.get = function(req, res){
+    if (!isNaN(req.a)){
+        math.fibonacciAsync(Math.floor(req.a), function(val){
+            sendResult(req, res, Math.floor(req.a) ,val);
+        });
+    }else {
+        sendResult(req, res, NaN, NaN);
+    }
+}
+
+fibo-node.js
+var htutil = require('./htutil');
+var math = require('./math');
+exports.get = function(req, res){
+    res.writeHead(200, {
+        'Content-Type': 'text/html'
+    });
+    res.end(
+        htutil.page("Fibonacci", htutil.navbar(), [
+            (!isNaN(req.a)
+                ? (
+                    "<p class='result'>{a} fibonacci = {fibo}</p>"
+                    .replace("{a}", Math.floor(req.a))
+                    .replace("{fibo}", math.fibonacci(Math.floor(req.a)))
+                )
+                : ""),
+            "<p>Enter numbers to see its fibonacci</p>",
+            "<form name='fibonacci' action='/fibonacci' method='get'>",
+            "A: <input type='text' name='a' /><br/>",
+            "<input type='submit' value='Submit' />",
+            "</form>"
+        ].join('\n'))
+    );
+}
+
+home-node.js
+var htutil = require('./htutil');
+exports.get = function(req, res){
+    res.writeHead(200, {'Content-Type': 'text/html'});
+    res.end(htutil.page(" ", htutil.navbar(), "<p> </p>"));
+
+}
+
+htutil.js
+var url = require('url');
+
+exports.loadParams = function(req, res, next){
+    req.requrl = url.parse(req.url, true);
+    req.a = (req.requrl.query.a && !isNaN(req.requrl.query.a))
+        ? new Number(req.requrl.query.a)
+        : NaN;
+    req.b = (req.requrl.query.b && !isNaN(req.requrl.query.b))
+        ? new Number(req.requrl.query.b)
+        : NaN;
+    if(next) next();
+}
+exports.navbar = function(){
+    return ["<div class='navbar'>",
+        "<p><a href='/'>home</a></p>",
+        "<p><a href='/mult'>Multiplication</a></p>",
+        "<p><a href='/square'>Square</a></p>",
+        "<p><a href='/factorial'>Factorial</a></p>",
+        "<p><a href='/fibonacci'>Fibonacci</a></p>",
+        "</div>"].join('\n');
+}
+exports.page = function(title, navbar, content){
+    return ["<html><head><title>{title}</title></head>",
+        "<td>{navbar}</td><td>{content}</td>",
+        "</tr></table></body></html>"
+    ].join('\n')
+        .replace(new RegExp("{title}", "gm"), title)
+        .replace("{navbar}", navbar)
+        .replace("{content}", content);
+}
+
+math.js
+var factorial = exports.factorial = function(n){
+    if (n == 0)
+        return 1;
+    else
+        return n * factorial(n-1);
+}
+var fibonacci = exports.fibonacci = function(n){
+    if (n === 1)
+        return 1;
+    else if (n === 2)
+        return 1;
+    else
+        return fibonacci(n-1) + fibonacci(n-2);
+}
+var fibonacciAsync = exports.fibonacciAsync = function(n, done){
+    if (n ==1 || n == 2)
+        done(1);
+    else {
+        process.nextTick(function(){
+            fibonacciAsync(n-1, function(val1){
+                process.nextTick(function(){
+                    fibonacciAsync(n-2, function(val2){
+                        done(val1 + val2);
+                    });
+                })
+            });
+        });
+    }
+}
+
+mult-node.js
+var htutil = require('./htutil');
+exports.get = function(req, res){
+    res.writeHead(200, {
+        'Content-Type': 'text/html'
+    });
+    var result = req.a * req.b;
+    res.end(
+        htutil.page("Multiplication", htutil.navbar(), [
+            (!isNaN(req.a) && !isNaN(req.b)
+                ? (
+
+                    "<p class='result'>{a} * {b} = {result}</p>"
+                    .replace("{a}", req.a)
+                    .replace("{b}", req.b)
+                    .replace("{result}", req.a * req.b)
+                )
+                : ""),
+            "<p>Enter numbers to mutiply</p>",
+            "<form name='mult' action='/mult' method='get'>",
+            "A: <input type='text' name='a' /><br/>",
+            "B: <input type='text' name='b' /><br/>",
+            "<input type='submit' value='Submit' />",
+            "</form>"
+        ].join('\n'))
+    );
+}
+
+square-node.js
+var htutil = require('./htutil');
+var char = "utf-8"
+exports.get = function(req, res){
+    res.writeHead(200, {'Content-Type': 'text/html'});
+    var result = req.a * req.a;
+    res.end(
+        htutil.page("Square", htutil.navbar(), [
+            (!isNaN(req.a) ?
+                ("<p class='result'><meta charset=\"UTF-8\">{a}²= {sq}</p>"
+                    .replace("{a}", req.a)
+                    .replace("{sq}", req.a * req.a))
+                : ""),
+            "<p>Enter numbers to see its square</p>",
+            "<form name='square' action='/square' method='get'>",
+            "A: <input type='text' name='a' /><br/>",
+            "<input type='submit' value='Submit' />",
+            "</form>"
+        ].join('\n'))
+    );
+}
